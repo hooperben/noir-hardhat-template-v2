@@ -11,9 +11,9 @@ contract MerkleTreeWithHistory {
     uint256 public constant FIELD_SIZE =
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
-    // our initial state - keccak256("baby-gronk-rizzed-up-livvy-done") % FIELD_SIZE
+    // our initial state - keccak256("livvy-dunne-just-rizzed-up-baby-gronk") % FIELD_SIZE
     uint256 public constant ZERO_VALUE =
-        11042180046256007602588091464931026257083279055928499211185390201469090652804;
+        2302824601438971867720504068764828943238518492587325167295657880505909878424;
 
     IHasher public hasher;
     uint32 public immutable levels;
