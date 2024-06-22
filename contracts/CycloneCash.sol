@@ -17,7 +17,7 @@ contract ProofOfRecord is MerkleTreeWithHistory {
         address _verifier,
         address _token,
         address _hasher
-    ) MerkleTreeWithHistory(8, _hasher, initial_leaf) {
+    ) MerkleTreeWithHistory(8, _hasher) {
         token = IERC20(_token);
     }
 
