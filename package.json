@@ -25,6 +25,6 @@
     "@openzeppelin/contracts": "^5.0.2"
   },
   "scripts": {
-    "build:contracts": "cd circuits && nargo codegen-verifier && cp contract/circuits/plonk_vk.sol ../contracts/circuits/UltraVerifier.sol && cd .."
+    "build:contracts": "./scripts/bash/build-circuit-to-contract.sh"
   }
 }
