@@ -196,21 +196,19 @@ describe("CycloneCash Testing", function () {
         siblings,
       };
 
-      console.log(input);
-
       const correctProof = await noir.generateProof(input);
 
       const isValidProof = await noir.verifyProof(correctProof);
       console.log(isValidProof);
 
       // finally, we can withdraw our funds
-      const CycloneCashWidthdrawer = CycloneCashContract.connect(Withdrawer);
+      const CycloneCashWithdrawer = CycloneCashContract.connect(Withdrawer);
 
       const withdrawerTokenBalanceBefore = await NotRealTokenContract.balanceOf(
         Withdrawer.address
       );
 
-      await CycloneCashWidthdrawer.withdrawal(
+      await CycloneCashWithdrawer.withdrawal(
         correctProof.proof,
         correctProof.publicInputs
       );
