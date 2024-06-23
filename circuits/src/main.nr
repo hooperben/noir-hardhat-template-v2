@@ -1,32 +1,55 @@
-use dep::noir_merkleroot;
 use dep::std;
 
-fn main(root: Field, leaf: Field, path_indices: [Field; 8], siblings: [Field; 8]) {
-    let new_root = noir_merkleroot::compute_merkle_root(leaf, path_indices, siblings);
-    assert(new_root == root);
+// Returns the merkle root of the tree from the provided leaf, path indices, siblings with poseidon hash.
+// this was taken from the noir_merkleroot crate (https://github.com/tomoima525/noir-merkle-root) - dependencies in noir are a bit of a pain so I've just copied it here
+fn compute_merkle_root(leaf: Field, path_indices: [Field; 8], siblings: [Field; 8]) -> Field {
+    let n = siblings.len();
+    let mut current = leaf;
+    for i in 0..n {
+        let is_right = (path_indices[i] == 1) as bool;
+        let (hash_left, hash_right) = if is_right {
+            (siblings[i], current)
+         } else {
+            (current, siblings[i])
+         };
+      current = std::hash::poseidon::bn254::hash_2([hash_left, hash_right]);
+    };
+    current
+}
+
+// this is our proving program
+fn main(
+    root: pub Field,
+    withdrawal_address: pub Field,
+    nullifier: pub Field,
+    withdrawal_address_nullifier: Field,
+    secret: Field, 
+    leaf_index: Field,
+    path_indices: [Field; 8],
+    siblings: [Field; 8],
+) {
+    // we re compute our leaf node here with the users secret
+    let leaf = std::hash::poseidon::bn254::hash_1([secret]);
+
+    // then we recreate the whole tree
+    let computed_root = compute_merkle_root(leaf, path_indices, siblings);
+
+    // if the root of our computed tree matches the root passed in (this is a public variable), it's a valid proof
+    assert(computed_root == root);
+
+    // next, we check that the nullifier is structured correctly
+    let computed_nullifier = std::hash::poseidon::bn254::hash_2([secret, leaf_index]);
+    assert(computed_nullifier == nullifier);
+
+    // finally, as part of this process we compute that the hashed input address = hash(address).
+    // this is to avoid front running, i.e someone seeing this proof publicly, submitting it themselves and stealing the withdrawal
+    // I think this can probably be done better? but if you know a better solution to, please hmu :)
+    let computed_address_hash = std::hash::poseidon::bn254::hash_1([withdrawal_address]);
+    assert(computed_address_hash == withdrawal_address_nullifier);
 }
 
 #[test]
-// this is the merkle test taken from the noir_merkleroot crate
-fn test_compute_merkle_root() {
-    let leaf = 13780856135824609486835123660791248959181113742546918549559321242116770234576;
-    let path_indices = [0, 0, 1, 1, 0, 1, 1, 0];
-    let siblings = [
-        14520510218039433773459597944105601781578483631006408988284677481489650471896,
-        16735405162150476769165535806199980191266151907719469609340290185602038249334,
-        11607634630385916762103142687024023731847490136503700052557112073181947753651,
-        1094530894963466396181348105151045704221228209480186211832907007839607915796,
-        3284044843315180235425920080565507273212761221150458610158014968492963231945,
-        4641050443441813769099735638332230934538706616831662404912867311564816535000,
-        13308983921089595976695015024214414181663897095192147251475586735720084500210,
-        12699940109500066053124654505808015855541980379149317240855603319465855478536,
-    ];
-    let root = noir_merkleroot::compute_merkle_root(leaf, path_indices, siblings);
-    assert(root == 3507270469832926990571112645872386345557614009066375654691910206440851534809);
-}
-
-#[test]
-fn test_initial_deposit() {
+fn test_merkle_proof() {
     let leaf = 20160893960736287353172201961072358781700170840597685064590079836896466519213;
     let path_indices = [0, 0, 0, 0, 0, 0, 0, 0];
     let siblings = [
@@ -39,6 +62,6 @@ fn test_initial_deposit() {
         5843760801858568328900092091113985717963143128804361557752173071357002045108,
         1143408232830562712557958746360441814316737212400365135670159679457111832921,
     ];
-    let root = noir_merkleroot::compute_merkle_root(leaf, path_indices, siblings);
+    let root = compute_merkle_root(leaf, path_indices, siblings);
     assert(root == 14691715986578578124196886834842542390222215612570999607106757387957373345619);
 }
