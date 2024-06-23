@@ -21,6 +21,9 @@ contract MerkleTreeWithHistory {
     uint256 public constant ZERO_VALUE =
         2302824601438971867720504068764828943238518492587325167295657880505909878424;
 
+    bytes32 public constant zk_leaf_root =
+        0x220e4b4823da0db552468228884e3a4675fc1bee50cb697891977312ae922800;
+
     IHasher public hasher;
     uint32 public levels;
 
@@ -29,7 +32,8 @@ contract MerkleTreeWithHistory {
     uint32 public currentRootIndex = 0;
     uint32 public nextIndex = 0;
     uint32 public constant ROOT_HISTORY_SIZE = 100;
-    bytes32[ROOT_HISTORY_SIZE] public roots;
+    // bytes32[ROOT_HISTORY_SIZE] public roots;
+    mapping(uint256 => bytes32) public roots;
 
     constructor(uint32 _treeLevels, address _hasher) {
         require(_treeLevels > 0, "_treeLevels should be greater than zero");
@@ -38,7 +42,7 @@ contract MerkleTreeWithHistory {
 
         hasher = IHasher(_hasher);
 
-        roots[0] = zeros(levels);
+        roots[0] = zk_leaf_root; // bytes32(ZERO_VALUE); // zeros(levels);
     }
 
     function hashLeftRight(
@@ -61,36 +65,38 @@ contract MerkleTreeWithHistory {
         return hasher.poseidon(input);
     }
 
-    function _insert(bytes32 _leaf) internal returns (uint32 index) {
-        uint32 currentIndex = nextIndex;
+    function _insert(
+        bytes32 _leaf1,
+        bytes32 _leaf2
+    ) internal returns (uint32 index) {
+        uint32 _nextIndex = nextIndex;
         require(
-            currentIndex != uint32(2) ** levels,
-            "Merkle tree is full. No more leafs can be added"
+            _nextIndex != uint32(2) ** levels,
+            "Merkle tree is full. No more leaves can be added"
         );
-        nextIndex += 1;
-        bytes32 currentLevelHash = _leaf;
+        uint32 currentIndex = _nextIndex / 2;
+        bytes32 currentLevelHash = hashLeftRight(_leaf1, _leaf2);
         bytes32 left;
         bytes32 right;
 
-        for (uint32 i = 0; i < levels; i++) {
+        for (uint32 i = 1; i < levels; i++) {
             if (currentIndex % 2 == 0) {
                 left = currentLevelHash;
                 right = zeros(i);
-
                 filledSubtrees[i] = currentLevelHash;
             } else {
                 left = filledSubtrees[i];
                 right = currentLevelHash;
             }
-
             currentLevelHash = hashLeftRight(left, right);
-
             currentIndex /= 2;
         }
 
-        currentRootIndex = (currentRootIndex + 1) % ROOT_HISTORY_SIZE;
-        roots[currentRootIndex] = currentLevelHash;
-        return nextIndex - 1;
+        uint32 newRootIndex = (currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        currentRootIndex = newRootIndex;
+        roots[newRootIndex] = currentLevelHash;
+        nextIndex = _nextIndex + 2;
+        return _nextIndex;
     }
 
     function isKnownRoot(bytes32 _root) public view returns (bool) {
@@ -114,8 +120,6 @@ contract MerkleTreeWithHistory {
         return roots[currentRootIndex];
     }
 
-    /// @dev provides Zero (Empty) elements for a MiMC MerkleTree. Up to 32 levels
-    // TODO: this should change to poseidon
     function zeros(uint256 i) public pure returns (bytes32) {
         if (i == 0)
             return

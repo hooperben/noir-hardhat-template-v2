@@ -15,7 +15,7 @@ contract CycloneCash is MerkleTreeWithHistory {
     UltraVerifier public verifier;
 
     // when a user withdraws, they use their note. This mapping keeps track of that
-    mapping(bytes32 nullifier => bool used) nullifers;
+    mapping(bytes32 nullifier => bool used) nullifiers;
 
     constructor(
         address _verifier,
@@ -26,16 +26,45 @@ contract CycloneCash is MerkleTreeWithHistory {
         verifier = UltraVerifier(_verifier);
     }
 
-    event Deposit(bytes32 indexed _leaf, uint256 indexed _leafIndex);
+    event NewLeaf(bytes32 indexed _leaf, uint256 indexed _leafIndex);
 
     function deposit(bytes32 _leaf) public {
         // transfer the tokens from the despositor to this contract
         token.transferFrom(msg.sender, address(this), DEPOSIT_AMOUNT);
 
         // insert our leaf in the tree
-        _insert(_leaf);
+        _insert(_leaf, zk_leaf_root);
 
-        // emit an event that a deposit has taken place (we need these event details to constuct or proof to claim)
-        emit Deposit(_leaf, nextIndex - 1);
+        // we emit the leaf and the next index, which makes it easier to construct our
+        // merkle tree proofs for the withdrawal process
+        emit NewLeaf(_leaf, nextIndex - 2);
+        emit NewLeaf(zk_leaf_root, nextIndex - 1);
+    }
+
+    event NullifierUsed(bytes32 nullifier);
+
+    function withdrawal(
+        bytes calldata _proof,
+        bytes32[] calldata _publicInputs
+    ) public {
+        // check the root that the user has provided is within our list of own roots
+        require(isKnownRoot(_publicInputs[0]), "Invalid root");
+
+        // check that this nullifier has not been used before
+        require(!nullifiers[_publicInputs[2]], "Nullifier already used");
+
+        // check their proof against our verifier contract
+        bool validProof = verifier.verify(_proof, _publicInputs);
+        require(validProof, "Invalid proof :(");
+
+        // mark this nullifier as claimed
+        nullifiers[_publicInputs[2]] = true;
+        emit NullifierUsed(_publicInputs[2]);
+
+        // send the withdrawing user their funds
+        token.transfer(
+            address(uint160(uint256(_publicInputs[1]))),
+            DEPOSIT_AMOUNT
+        );
     }
 }

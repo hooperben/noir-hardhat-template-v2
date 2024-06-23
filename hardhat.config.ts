@@ -16,7 +16,6 @@ const config: HardhatUserConfig = {
           },
         },
       },
-      viaIR: true, // We need to enable viaIR
     },
   },
 };
