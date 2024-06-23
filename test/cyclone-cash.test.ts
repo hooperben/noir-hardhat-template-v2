@@ -1,7 +1,13 @@
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { poseidonContract } from "circomlibjs";
 import { ethers } from "hardhat";
-import { Contract, parseEther, AbiCoder, Interface } from "ethers";
+import {
+  Contract,
+  parseEther,
+  AbiCoder,
+  Interface,
+  encodeBytes32String,
+} from "ethers";
 import {
   CycloneCash,
   CycloneCash__factory,
@@ -16,11 +22,12 @@ import {
 } from "../helpers/poseidon";
 import { expect } from "chai";
 
-describe("Proof of Record - ZK Merkle Testing", function () {
+const abi = new AbiCoder();
+
+describe("CycloneCash Testing", function () {
   let Deployer: SignerWithAddress;
 
   let NotRealTokenContract: NotRealToken;
-  let NotRealTokenAddress: string;
 
   let CycloneCashContract: CycloneCash;
   let CycloneCashAddress: string;
@@ -59,7 +66,6 @@ describe("Proof of Record - ZK Merkle Testing", function () {
       NotRealToken__factory.abi,
       Deployer
     ) as unknown as NotRealToken;
-    NotRealTokenAddress = _token;
 
     // finally, we deploy the CycloneCash contract
     const CycloneCash = await ethers.getContractFactory("CycloneCash");
@@ -79,7 +85,7 @@ describe("Proof of Record - ZK Merkle Testing", function () {
     await ensurePoseidon();
   });
 
-  describe("deposit testing", function () {
+  describe("CycloneCash User Flow Testing", function () {
     it("should be able to deposit as a user with 10 tokens", async () => {
       const balanceBefore = await NotRealTokenContract.balanceOf(
         Deployer.address
@@ -88,32 +94,34 @@ describe("Proof of Record - ZK Merkle Testing", function () {
       // we need to approve the cyclone cash contract to move our not real tokens
       await NotRealTokenContract.approve(CycloneCashAddress, DEPOSIT_AMOUNT);
 
-      // next, we need to a typescript representation of the merkle tree in our Cyclone Cash contract
-      let leaves: [] = []; // our tree is currently empty
-      const tree = new MerkleTree(8, leaves, {
-        hashFunction: poseidonHash2, // the hash function our tree uses
-        zeroElement:
-          "2302824601438971867720504068764828943238518492587325167295657880505909878424", // ZERO_VALUE in MerkleTreeWithHistory.sol
-      });
-
-      // next the user generates their secret
+      // in order to create a deposit, the user creates a secret
       const secret =
         210881053148100735089756133441334702741123279382268018806244279187332357251n; // getRandomBigInt(256);
 
+      // this secret is then hashed, and that is our leaf node value
       const hashedSecret = poseidonHash([secret]);
-      console.log(hashedSecret);
-      console.log(secret);
 
-      const abi = new AbiCoder();
-
-      const tx = await CycloneCashContract.deposit(
+      // we call deposit on the contract with our generated leaf node, and that's the whole deposit flow!
+      await CycloneCashContract.deposit(
         abi.encode(["uint256"], [hashedSecret])
       );
 
-      const receipt = await tx.wait();
+      console.log(hashedSecret);
+      console.log(`0x${BigInt(hashedSecret).toString(16)}`);
 
-      if (!receipt) throw new Error("receipt was null!");
-      const decodedLogs = receipt?.logs
+      const balanceAfter = await NotRealTokenContract.balanceOf(
+        Deployer.address
+      );
+
+      // check that our deposit correctly decremented our user
+      expect(balanceAfter).to.eq(balanceBefore - DEPOSIT_AMOUNT);
+
+      // next, it's time for this user to create their withdrawal proof, and withdrawal their balance
+
+      // first, we get all despoit events from the contract, to reconstruct the tree.
+      const filter = CycloneCashContract.filters.Deposit();
+      const events = await CycloneCashContract.queryFilter(filter);
+      const parsedDepositLogs = events
         .map((log) => {
           try {
             const sm = new Interface(CycloneCash__factory.abi);
@@ -125,31 +133,43 @@ describe("Proof of Record - ZK Merkle Testing", function () {
         })
         .filter((log) => log !== null);
 
-      const newLeaves = decodedLogs
-        .sort((a, b) => {
-          return Number(a.args[1]) - Number(b.args[1]);
+      // next, we order the deposit logs by their index
+      const leaves = parsedDepositLogs
+        // these should be better than any but Log parsing sucks :(
+        .sort((a: any, b: any) => {
+          return Number(a.args._leafIndex) - Number(b.args._leafIndex);
         })
-        .map((e) => {
-          return BigInt(e.args[0]).toString();
+        .map((e: any) => {
+          return BigInt(e.args._leaf).toString();
         });
 
-      const balanceAfter = await NotRealTokenContract.balanceOf(
-        Deployer.address
-      );
+      console.log(leaves.length);
 
-      expect(balanceAfter).to.eq(balanceBefore - DEPOSIT_AMOUNT);
-
-      const newTree = new MerkleTree(8, newLeaves, {
+      // then we construct our Typescript Version of our contracts tree
+      const tree = new MerkleTree(8, leaves, {
         hashFunction: poseidonHash2, // the hash function our tree uses
         zeroElement:
-          "2302824601438971867720504068764828943238518492587325167295657880505909878424", // ZERO_VALUE in MerkleTreeWithHistory.sol
+          "21663839004416932945382355908790599225266501822907911457504978515578255421292", // ZERO_VALUE in MerkleTreeWithHistory.sol
       });
 
-      console.log(newLeaves[0]);
-      console.log(newTree.root);
-      const merkleProof = newTree.proof(newLeaves[0]);
+      const formattedTreeRoot = `${BigInt(tree.root).toString(16)}`;
 
-      console.log(merkleProof);
+      console.log("known roots: ");
+      console.log(await CycloneCashContract.roots(0));
+      console.log(await CycloneCashContract.roots(1));
+
+      console.log("ts root:");
+      console.log(tree.root);
+
+      console.log("abi");
+      console.log(abi.encode(["uint256"], [tree.root]));
+
+      // to check that our tree creation went well, we can check it with the current root
+      const isKnownRoot = await CycloneCashContract.isKnownRoot(
+        abi.encode(["uint256"], [tree.root])
+      );
+      console.log(isKnownRoot);
+      // expect(tree.root).equal(BigInt(currentRoot));
     });
   });
 });
