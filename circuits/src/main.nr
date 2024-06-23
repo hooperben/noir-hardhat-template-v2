@@ -20,8 +20,8 @@ fn compute_merkle_root(leaf: Field, path_indices: [Field; 8], siblings: [Field; 
 // this is our proving program
 fn main(
     root: pub Field,
-    withdrawal_address: pub Field,
     nullifier: pub Field,
+    withdrawal_address: pub Field,
     withdrawal_address_nullifier: Field,
     secret: Field, 
     leaf_index: Field,
@@ -64,4 +64,39 @@ fn test_merkle_proof() {
     ];
     let root = compute_merkle_root(leaf, path_indices, siblings);
     assert(root == 14691715986578578124196886834842542390222215612570999607106757387957373345619);
+}
+
+#[test]
+fn test_full() {
+    let root = 75190520710780401948067433999385770301096321980220655773929207270650200867;
+    let withdrawal_address = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+    let nullifier = 12879424165363334420548700187500177262275980757655486996941226276727671071040;
+    let withdrawal_address_nullifier = 15308599444853185495975605022755639098668479284268041237596467979088779027121;
+    let secret = 210881053148100735089756133441334702741123279382268018806244279187332357251;
+    let leaf_index = 0;
+    let path_indices = [
+      0, 0, 0, 0,
+      0, 0, 0, 0
+    ];
+    let siblings = [
+      15403892286605756147578194685398955343522683323319211105324859804267310098432,
+      8995896153219992062710898675021891003404871425075198597897889079729967997688,
+      15126246733515326086631621937388047923581111613947275249184377560170833782629,
+      6404200169958188928270149728908101781856690902670925316782889389790091378414,
+      17903822129909817717122288064678017104411031693253675943446999432073303897479,
+      11423673436710698439362231088473903829893023095386581732682931796661338615804,
+      10494842461667482273766668782207799332467432901404302674544629280016211342367,
+      17400501067905286947724900644309270241576392716005448085614420258732805558809
+    ];
+
+    let leaf = std::hash::poseidon::bn254::hash_1([secret]);
+
+    let computed_root = compute_merkle_root(leaf, path_indices, siblings);
+    assert(computed_root == root);
+
+    let computed_nullifier = std::hash::poseidon::bn254::hash_2([secret, leaf_index]);
+    assert(computed_nullifier == nullifier);
+
+    let computed_address_hash = std::hash::poseidon::bn254::hash_1([withdrawal_address]);
+    assert(computed_address_hash == withdrawal_address_nullifier);
 }

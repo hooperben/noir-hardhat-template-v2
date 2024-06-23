@@ -45,21 +45,21 @@ contract CycloneCash is MerkleTreeWithHistory {
 
     function withdrawal(
         bytes calldata _proof,
-        bytes32[] calldata _publicInputs
+        bytes32[] calldata _publicInputs // [root, nullifier, receiver]
     ) public {
         // check the root that the user has provided is within our list of own roots
         require(isKnownRoot(_publicInputs[0]), "Invalid root");
 
         // check that this nullifier has not been used before
-        require(!nullifiers[_publicInputs[2]], "Nullifier already used");
+        require(!nullifiers[_publicInputs[1]], "Nullifier already used");
 
         // check their proof against our verifier contract
         bool validProof = verifier.verify(_proof, _publicInputs);
         require(validProof, "Invalid proof :(");
 
         // mark this nullifier as claimed
-        nullifiers[_publicInputs[2]] = true;
-        emit NullifierUsed(_publicInputs[2]);
+        nullifiers[_publicInputs[1]] = true;
+        emit NullifierUsed(_publicInputs[1]);
 
         // send the withdrawing user their funds
         token.transfer(
