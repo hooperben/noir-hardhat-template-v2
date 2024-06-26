@@ -63,7 +63,7 @@ contract CycloneCash is MerkleTreeWithHistory {
 
         // send the withdrawing user their funds
         token.transfer(
-            address(uint160(uint256(_publicInputs[1]))),
+            address(uint160(uint256(_publicInputs[2]))), // this is the withdrawal address (decoded from bytes32)
             DEPOSIT_AMOUNT
         );
     }
