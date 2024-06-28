@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./MerkleTreeWithHistory.sol";
 import "./circuits/UltraVerifier.sol";
 
-contract CycloneCash is MerkleTreeWithHistory {
+contract AssetShield is MerkleTreeWithHistory {
     // the address of the ERC20 that can be deposited to this contract
     IERC20 public immutable token;
     // the token amount that can be deposited as part of the deposit() function

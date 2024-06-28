@@ -14,6 +14,7 @@ interface IHasher {
  */
 
 contract MerkleTreeWithHistory {
+    // the max value that can be hashed within our tree
     uint256 public constant FIELD_SIZE =
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
@@ -42,7 +43,7 @@ contract MerkleTreeWithHistory {
 
         hasher = IHasher(_hasher);
 
-        roots[0] = zk_leaf_root; // bytes32(ZERO_VALUE); // zeros(levels);
+        roots[0] = zk_leaf_root;
     }
 
     function hashLeftRight(

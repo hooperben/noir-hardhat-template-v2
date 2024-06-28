@@ -14,8 +14,8 @@ import {
   poseidonHash2,
 } from "../helpers/poseidon";
 import {
-  CycloneCash,
-  CycloneCash__factory,
+  AssetShield,
+  AssetShield__factory,
   NotRealToken,
   NotRealToken__factory,
 } from "../typechain-types";
@@ -34,14 +34,14 @@ const getCircuit = async () => {
   return result.program as CompiledCircuit;
 };
 
-describe("CycloneCash Testing", function () {
+describe("AssetShield Testing", function () {
   let Deployer: SignerWithAddress;
   let Withdrawer: SignerWithAddress;
 
   let NotRealTokenContract: NotRealToken;
 
-  let CycloneCashContract: CycloneCash;
-  let CycloneCashAddress: string;
+  let AssetShieldContract: AssetShield;
+  let AssetShieldAddress: string;
 
   let circuit: CompiledCircuit;
   let noir: Noir;
@@ -81,19 +81,19 @@ describe("CycloneCash Testing", function () {
       Deployer
     ) as unknown as NotRealToken;
 
-    // finally, we deploy the CycloneCash contract
-    const CycloneCash = await ethers.getContractFactory("CycloneCash");
-    const cycloneCash = await CycloneCash.deploy(_verifer, _token, _hasher);
-    await cycloneCash.waitForDeployment();
+    // finally, we deploy the AssetShield contract
+    const AssetShield = await ethers.getContractFactory("AssetShield");
+    const assetShield = await AssetShield.deploy(_verifer, _token, _hasher);
+    await assetShield.waitForDeployment();
 
-    const _cycloneCash = await cycloneCash.getAddress();
+    const _AssetShield = await assetShield.getAddress();
 
-    CycloneCashContract = new Contract(
-      _cycloneCash,
-      CycloneCash__factory.abi,
+    AssetShieldContract = new Contract(
+      _AssetShield,
+      AssetShield__factory.abi,
       Deployer
-    ) as unknown as CycloneCash;
-    CycloneCashAddress = _cycloneCash;
+    ) as unknown as AssetShield;
+    AssetShieldAddress = _AssetShield;
 
     // next we initialise our Noir libraries to generate proofs
     circuit = await getCircuit();
@@ -105,14 +105,14 @@ describe("CycloneCash Testing", function () {
     await ensurePoseidon();
   });
 
-  describe("CycloneCash User Flow Testing", function () {
+  describe("AssetShield User Flow Testing", function () {
     it("should be able to deposit as a user with 10 tokens", async () => {
       const balanceBefore = await NotRealTokenContract.balanceOf(
         Deployer.address
       );
 
       // we need to approve the cyclone cash contract to move our not real tokens
-      await NotRealTokenContract.approve(CycloneCashAddress, DEPOSIT_AMOUNT);
+      await NotRealTokenContract.approve(AssetShieldAddress, DEPOSIT_AMOUNT);
 
       // in order to create a deposit, the user creates a secret
       const secret =
@@ -122,7 +122,7 @@ describe("CycloneCash Testing", function () {
       const hashedSecret = poseidonHash([secret]);
 
       // we call deposit on the contract with our generated leaf node, and that's the whole deposit flow!
-      await CycloneCashContract.deposit(
+      await AssetShieldContract.deposit(
         abi.encode(["uint256"], [hashedSecret])
       );
 
@@ -136,12 +136,12 @@ describe("CycloneCash Testing", function () {
       // next, it's time for this user to create their withdrawal proof, and withdrawal their balance
 
       // first, we get all despoit events from the contract, to reconstruct the tree.
-      const filter = CycloneCashContract.filters.NewLeaf();
-      const events = await CycloneCashContract.queryFilter(filter);
+      const filter = AssetShieldContract.filters.NewLeaf();
+      const events = await AssetShieldContract.queryFilter(filter);
       const parsedDepositLogs = events
         .map((log) => {
           try {
-            const sm = new Interface(CycloneCash__factory.abi);
+            const sm = new Interface(AssetShield__factory.abi);
             return sm.parseLog(log);
           } catch (error) {
             // This log was not from your contract, or not an event your contract emits
@@ -167,8 +167,17 @@ describe("CycloneCash Testing", function () {
           "21663839004416932945382355908790599225266501822907911457504978515578255421292", // TODO change to custom
       });
 
+      console.log(await AssetShieldContract.roots(0));
+
+      const test = abi.encode(
+        ["uint256"],
+        [await AssetShieldContract.roots(0)]
+      );
+
+      console.log(test.toString());
+
       // to check that our tree creation went well, we can check it with the current root
-      const isKnownRoot = await CycloneCashContract.isKnownRoot(
+      const isKnownRoot = await AssetShieldContract.isKnownRoot(
         abi.encode(["uint256"], [tree.root])
       );
 
@@ -203,13 +212,13 @@ describe("CycloneCash Testing", function () {
       console.log(isValidProof);
 
       // finally, we can withdraw our funds
-      const CycloneCashWithdrawer = CycloneCashContract.connect(Withdrawer);
+      const AssetShieldWithdrawer = AssetShieldContract.connect(Withdrawer);
 
       const withdrawerTokenBalanceBefore = await NotRealTokenContract.balanceOf(
         Withdrawer.address
       );
 
-      await CycloneCashWithdrawer.withdrawal(
+      await AssetShieldWithdrawer.withdrawal(
         correctProof.proof,
         correctProof.publicInputs
       );
