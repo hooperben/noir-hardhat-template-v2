@@ -1,13 +1,13 @@
 import { BarretenbergBackend } from "@noir-lang/backend_barretenberg";
 import { Noir } from "@noir-lang/noir_js";
-import { compile, createFileManager } from "@noir-lang/noir_wasm";
 import { CompiledCircuit } from "@noir-lang/types";
+import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { expect } from "chai";
 import { poseidonContract } from "circomlibjs";
-import { Contract, AbiCoder, parseEther, Interface } from "ethers";
+import { AbiCoder, Contract, Interface, parseEther } from "ethers";
 import MerkleTree from "fixed-merkle-tree";
 import { ethers } from "hardhat";
-import { resolve } from "path";
+import { getAndBuildCircuit } from "../helpers/getAndBuildCircuit";
 import {
   ensurePoseidon,
   poseidonHash,
@@ -20,19 +20,7 @@ import {
   NotRealToken__factory,
 } from "../typechain-types";
 
-import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
-
 const abi = new AbiCoder();
-
-const getCircuit = async () => {
-  const basePath = resolve("./circuits/");
-  const fm = createFileManager(basePath);
-  const result = await compile(fm);
-  if (!("program" in result)) {
-    throw new Error("Compilation failed");
-  }
-  return result.program as CompiledCircuit;
-};
 
 describe("AssetShield Testing", function () {
   let Deployer: SignerWithAddress;
@@ -96,7 +84,7 @@ describe("AssetShield Testing", function () {
     AssetShieldAddress = _AssetShield;
 
     // next we initialise our Noir libraries to generate proofs
-    circuit = await getCircuit();
+    circuit = await getAndBuildCircuit();
 
     const backend = new BarretenbergBackend(circuit);
     noir = new Noir(circuit, backend);
