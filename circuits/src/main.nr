@@ -1,7 +1,7 @@
 use dep::std;
 
 // Returns the merkle root of the tree from the provided leaf, path indices, siblings with poseidon hash.
-// this was taken from the noir_merkleroot crate (https://github.com/tomoima525/noir-merkle-root) - dependencies in noir are a bit of a pain so I've just copied it here
+// this was taken from the noir_merkleroot crate (https://github.com/tomoima525/noir-merkle-root)
 fn compute_merkle_root(leaf: Field, path_indices: [Field; 8], siblings: [Field; 8]) -> Field {
     let n = siblings.len();
     let mut current = leaf;
@@ -17,7 +17,7 @@ fn compute_merkle_root(leaf: Field, path_indices: [Field; 8], siblings: [Field; 
     current
 }
 
-// this is our proving program
+// this is our proving program. This is what becomes our UltraVerifier.sol contract (when we run bun build:circuit)
 fn main(
     root: pub Field,
     nullifier: pub Field,
