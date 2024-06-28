@@ -12,7 +12,6 @@ const config: HardhatUserConfig = {
           yul: true,
           yulDetails: {
             stackAllocation: true,
-            optimizerSteps: "dhfoDgvulfnTUtnIf",
           },
         },
       },
