@@ -31,6 +31,6 @@
     "typescript": "^5.4.5"
   },
   "scripts": {
-    "build:contracts": "./scripts/bash/build-circuit-to-contract.sh"
+    "build:circuit": "./scripts/bash/build-circuit-to-contract.sh"
   }
 }
