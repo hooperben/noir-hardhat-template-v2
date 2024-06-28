@@ -33,12 +33,12 @@ contract AssetShield is MerkleTreeWithHistory {
         token.transferFrom(msg.sender, address(this), DEPOSIT_AMOUNT);
 
         // insert our leaf in the tree
-        _insert(_leaf, zk_leaf_root);
+        _insert(_leaf, bytes32(ZERO_VALUE));
 
         // we emit the leaf and the next index, which makes it easier to construct our
         // merkle tree proofs for the withdrawal process
         emit NewLeaf(_leaf, nextIndex - 2);
-        emit NewLeaf(zk_leaf_root, nextIndex - 1);
+        emit NewLeaf(bytes32(ZERO_VALUE), nextIndex - 1);
     }
 
     event NullifierUsed(bytes32 nullifier);

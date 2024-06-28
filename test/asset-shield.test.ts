@@ -4,7 +4,13 @@ import { CompiledCircuit } from "@noir-lang/types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { expect } from "chai";
 import { poseidonContract } from "circomlibjs";
-import { AbiCoder, Contract, Interface, parseEther } from "ethers";
+import {
+  AbiCoder,
+  Contract,
+  Interface,
+  encodeBytes32String,
+  parseEther,
+} from "ethers";
 import MerkleTree from "fixed-merkle-tree";
 import { ethers } from "hardhat";
 import { getAndBuildCircuit } from "../helpers/getAndBuildCircuit";
@@ -148,21 +154,28 @@ describe("AssetShield Testing", function () {
           return BigInt(e.args._leaf).toString();
         });
 
+      const emptyTree = new MerkleTree(8, [], {
+        hashFunction: poseidonHash2,
+        zeroElement:
+          "2302824601438971867720504068764828943238518492587325167295657880505909878424",
+      });
+
+      console.log("emptyTree.root");
+      console.log(emptyTree.root);
+      console.log(abi.encode(["uint256"], [emptyTree.root]));
+
       // then we construct our Typescript Version of our contracts tree
       const tree = new MerkleTree(8, leaves, {
         hashFunction: poseidonHash2, // the hash function our tree uses
         zeroElement:
-          "21663839004416932945382355908790599225266501822907911457504978515578255421292", // TODO change to custom
+          "2302824601438971867720504068764828943238518492587325167295657880505909878424",
       });
 
+      console.log(tree.root);
+      console.log(abi.encode(["uint256"], [tree.root]));
+
       console.log(await AssetShieldContract.roots(0));
-
-      const test = abi.encode(
-        ["uint256"],
-        [await AssetShieldContract.roots(0)]
-      );
-
-      console.log(test.toString());
+      console.log(await AssetShieldContract.roots(1));
 
       // to check that our tree creation went well, we can check it with the current root
       const isKnownRoot = await AssetShieldContract.isKnownRoot(
