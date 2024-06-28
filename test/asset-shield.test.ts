@@ -4,13 +4,7 @@ import { CompiledCircuit } from "@noir-lang/types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { expect } from "chai";
 import { poseidonContract } from "circomlibjs";
-import {
-  AbiCoder,
-  Contract,
-  Interface,
-  encodeBytes32String,
-  parseEther,
-} from "ethers";
+import { AbiCoder, Contract, Interface, parseEther } from "ethers";
 import MerkleTree from "fixed-merkle-tree";
 import { ethers } from "hardhat";
 import { getAndBuildCircuit } from "../helpers/getAndBuildCircuit";
@@ -26,11 +20,10 @@ import {
   NotRealToken__factory,
 } from "../typechain-types";
 
-const abi = new AbiCoder();
-
 describe("AssetShield Testing", function () {
   let Deployer: SignerWithAddress;
   let Withdrawer: SignerWithAddress;
+  let Runner: SignerWithAddress;
 
   let NotRealTokenContract: NotRealToken;
 
@@ -41,9 +34,10 @@ describe("AssetShield Testing", function () {
   let noir: Noir;
 
   const DEPOSIT_AMOUNT = parseEther("10");
+  const abi = new AbiCoder();
 
   before(async () => {
-    [Deployer, Withdrawer] = await ethers.getSigners();
+    [Deployer, Withdrawer, Runner] = await ethers.getSigners();
     // Firstly, we deploy all our of contracts
     // we need to deploy the poseidon hasher contract for the MerkleTreeWithHistory contract
     const hasherAbi = poseidonContract.generateABI(2);
@@ -101,16 +95,17 @@ describe("AssetShield Testing", function () {
 
   describe("AssetShield User Flow Testing", function () {
     it("should be able to deposit as a user with 10 tokens", async () => {
+      // before the process starts, get the balance of the depositoor for testing purposes
       const balanceBefore = await NotRealTokenContract.balanceOf(
         Deployer.address
       );
 
-      // we need to approve the cyclone cash contract to move our not real tokens
+      // we need to approve the AssetShield contract to move our not real tokens
       await NotRealTokenContract.approve(AssetShieldAddress, DEPOSIT_AMOUNT);
 
-      // in order to create a deposit, the user creates a secret
+      // in order to create a deposit, the user creates a secret that only they know, which is used in the withdrawal proof
       const secret =
-        210881053148100735089756133441334702741123279382268018806244279187332357251n; // getRandomBigInt(256);
+        210881053148100735089756133441334702741123279382268018806244279187332357251n; // output of helpers/getRandomBigInt(256);
 
       // this secret is then hashed, and that is our leaf node value
       const hashedSecret = poseidonHash([secret]);
@@ -154,28 +149,12 @@ describe("AssetShield Testing", function () {
           return BigInt(e.args._leaf).toString();
         });
 
-      const emptyTree = new MerkleTree(8, [], {
-        hashFunction: poseidonHash2,
-        zeroElement:
-          "2302824601438971867720504068764828943238518492587325167295657880505909878424",
-      });
-
-      console.log("emptyTree.root");
-      console.log(emptyTree.root);
-      console.log(abi.encode(["uint256"], [emptyTree.root]));
-
-      // then we construct our Typescript Version of our contracts tree
+      // then we construct our Typescript Version of our contracts tree using the sorted leaves
       const tree = new MerkleTree(8, leaves, {
         hashFunction: poseidonHash2, // the hash function our tree uses
         zeroElement:
-          "2302824601438971867720504068764828943238518492587325167295657880505909878424",
+          "2302824601438971867720504068764828943238518492587325167295657880505909878424", // our ZERO_VALUE on the contract
       });
-
-      console.log(tree.root);
-      console.log(abi.encode(["uint256"], [tree.root]));
-
-      console.log(await AssetShieldContract.roots(0));
-      console.log(await AssetShieldContract.roots(1));
 
       // to check that our tree creation went well, we can check it with the current root
       const isKnownRoot = await AssetShieldContract.isKnownRoot(
@@ -193,7 +172,11 @@ describe("AssetShield Testing", function () {
       const siblings = merkleProof.pathElements.map((i) => i.toString());
       const root = tree.root;
       const withdrawalAddress = Withdrawer.address;
+
+      // a nullifier is something that just spends this note. This secret and leaf index can only be used once, so that is our nullifier
       const nullifier = poseidonHash([secret, leafIndex]);
+
+      // to avoid front-running, we hash the withdrawal address too and include that in the proof
       const withdrawalNullifierAddress = poseidonHash([withdrawalAddress]);
 
       const input = {
@@ -207,30 +190,32 @@ describe("AssetShield Testing", function () {
         siblings,
       };
 
-      const correctProof = await noir.generateProof(input);
+      // generate our zk proof
+      const zkProof = await noir.generateProof(input);
 
-      const isValidProof = await noir.verifyProof(correctProof);
-      console.log(isValidProof);
-
-      // finally, we can withdraw our funds
-      const AssetShieldWithdrawer = AssetShieldContract.connect(Withdrawer);
+      // finally, we can withdraw our funds. We will submit this tx through a runner (an unpermissioned EOA)
+      const AssetShieldRunner = AssetShieldContract.connect(Runner);
 
       const withdrawerTokenBalanceBefore = await NotRealTokenContract.balanceOf(
         Withdrawer.address
       );
 
-      await AssetShieldWithdrawer.withdrawal(
-        correctProof.proof,
-        correctProof.publicInputs
-      );
+      // we just call the withdraw function with our proof and public inputs
+      await AssetShieldRunner.withdrawal(zkProof.proof, zkProof.publicInputs);
 
       const withdrawerTokenBalanceAfter = await NotRealTokenContract.balanceOf(
         Withdrawer.address
       );
 
+      // our withdrawer should have + 10 tokens now
       expect(withdrawerTokenBalanceAfter).to.eq(
         withdrawerTokenBalanceBefore + DEPOSIT_AMOUNT
       );
+
+      // if we try to withdraw again, our nullifier will be invalid
+      await expect(
+        AssetShieldRunner.withdrawal(zkProof.proof, zkProof.publicInputs)
+      ).to.be.revertedWith("Nullifier already used!");
     });
   });
 });

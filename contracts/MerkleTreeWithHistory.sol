@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-import "hardhat/console.sol";
+pragma solidity ^0.8.24;
 
 interface IHasher {
     function poseidon(
@@ -13,6 +11,7 @@ interface IHasher {
  * @title MerkleTreeWithHistory
  * @notice This constract is a Merkle Tree With History based heavily on the tornado cash MerkleTreeWithHistory implementation,
  *         but with the Poseidon hash function instead of MiMCSponge.
+ * @dev Don't use this in production - for demo purposes only
  */
 
 contract MerkleTreeWithHistory {

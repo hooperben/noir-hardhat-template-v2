@@ -6,17 +6,34 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./MerkleTreeWithHistory.sol";
 import "./circuits/UltraVerifier.sol";
 
+/**
+ * @title AssetShield
+ * @author benhooper.eth
+ * @notice A simple demo contract showing how to mutate state within a contract, using ZK proofs
+ */
 contract AssetShield is MerkleTreeWithHistory {
     // the address of the ERC20 that can be deposited to this contract
     IERC20 public immutable token;
+
     // the token amount that can be deposited as part of the deposit() function
     uint256 public immutable DEPOSIT_AMOUNT = 10 * 10 ** 18; // 10 with 18 Decimals
-    // this is our contract where we verify our ZK proofs
+
+    // this is our contract where we verify our ZK proofs passed into the withdrawal function
     UltraVerifier public verifier;
 
     // when a user withdraws, they use their note. This mapping keeps track of that
     mapping(bytes32 nullifier => bool used) nullifiers;
 
+    // event emitted when a new leaf is inserted into the tree
+    event NewLeaf(bytes32 indexed _leaf, uint256 indexed _leafIndex);
+
+    // event emitted when a nullifier is used
+    event NullifierUsed(bytes32 nullifier);
+
+    /// constructooor
+    /// @param _verifier The address of the codegen-verifier contract
+    /// @param _token The token address of the ERC20 that will be deposited and withdrawn from this contract
+    /// @param _hasher The address of the contract that handles our poseidon hash function
     constructor(
         address _verifier,
         address _token,
@@ -25,8 +42,6 @@ contract AssetShield is MerkleTreeWithHistory {
         token = IERC20(_token);
         verifier = UltraVerifier(_verifier);
     }
-
-    event NewLeaf(bytes32 indexed _leaf, uint256 indexed _leafIndex);
 
     function deposit(bytes32 _leaf) public {
         // transfer the tokens from the despositor to this contract
@@ -41,17 +56,15 @@ contract AssetShield is MerkleTreeWithHistory {
         emit NewLeaf(bytes32(ZERO_VALUE), nextIndex - 1);
     }
 
-    event NullifierUsed(bytes32 nullifier);
-
     function withdrawal(
         bytes calldata _proof,
         bytes32[] calldata _publicInputs // [root, nullifier, receiver]
     ) public {
         // check the root that the user has provided is within our list of own roots
-        require(isKnownRoot(_publicInputs[0]), "Invalid root");
+        require(isKnownRoot(_publicInputs[0]), "Invalid merkle root");
 
         // check that this nullifier has not been used before
-        require(!nullifiers[_publicInputs[1]], "Nullifier already used");
+        require(!nullifiers[_publicInputs[1]], "Nullifier already used!");
 
         // check their proof against our verifier contract
         bool validProof = verifier.verify(_proof, _publicInputs);
