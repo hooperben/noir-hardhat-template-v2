@@ -12,6 +12,11 @@ bun install
 
 but you can use `npm`, `yarn`, whatever floats your boat.
 
+You will also need:
+
+- nargo (version >= 0.31.0)
+- bb (version >= 0.46.1)
+
 ### Set Up
 
 From root, this is a hardhat project. That means that you just run:
@@ -32,7 +37,7 @@ for any other hardhat commands.
 
 The Noir project is located at `circuits/`. You can read more about Noir project structure in their [docs](https://noir-lang.org/docs/).
 
-For this template, it's assumed that you will have `nargo >= 0.30.0` installed. You can find installation instructions [here](https://noir-lang.org/docs/getting_started/installation/).
+For this template, it's assumed that you will have `nargo >= 0.31.0` installed. You can find installation instructions [here](https://noir-lang.org/docs/getting_started/installation/).
 
 Noir allows you to test your circuit within the `circuits/src/main.nr` file, and those tests can be ran with:
 
