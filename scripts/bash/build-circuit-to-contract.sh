@@ -1,5 +1,10 @@
 cd circuits
-nargo codegen-verifier 
-cp contract/circuits/plonk_vk.sol ../contracts/circuits/UltraVerifier.sol 
+nargo compile
+
+bb write_vk -b ./target/circuits.json
+bb contract
+
+cp ./target/contract.sol ../contracts/circuits/UltraVerifier.sol
 cd ..
 
+echo 'succesfully created contract from circuit'

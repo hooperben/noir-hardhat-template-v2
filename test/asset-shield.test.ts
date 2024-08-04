@@ -6,8 +6,9 @@ import { expect } from "chai";
 import { poseidonContract } from "circomlibjs";
 import { AbiCoder, Contract, Interface, parseEther } from "ethers";
 import MerkleTree from "fixed-merkle-tree";
+import { readFileSync } from "fs";
 import { ethers } from "hardhat";
-import { getAndBuildCircuit } from "../helpers/getAndBuildCircuit";
+import { resolve } from "path";
 import {
   ensurePoseidon,
   poseidonHash,
@@ -30,8 +31,8 @@ describe("AssetShield Testing", function () {
   let AssetShieldContract: AssetShield;
   let AssetShieldAddress: string;
 
-  let circuit: CompiledCircuit;
   let noir: Noir;
+  let backend: BarretenbergBackend;
 
   const DEPOSIT_AMOUNT = parseEther("10");
   const abi = new AbiCoder();
@@ -44,7 +45,7 @@ describe("AssetShield Testing", function () {
     const HasherFactory = new ethers.ContractFactory(
       hasherAbi,
       poseidonContract.createCode(2),
-      Deployer
+      Deployer,
     );
     const tx = await HasherFactory.deploy();
     await tx.waitForDeployment();
@@ -66,7 +67,7 @@ describe("AssetShield Testing", function () {
     NotRealTokenContract = new Contract(
       _token,
       NotRealToken__factory.abi,
-      Deployer
+      Deployer,
     ) as unknown as NotRealToken;
 
     // finally, we deploy the AssetShield contract
@@ -79,15 +80,19 @@ describe("AssetShield Testing", function () {
     AssetShieldContract = new Contract(
       _AssetShield,
       AssetShield__factory.abi,
-      Deployer
+      Deployer,
     ) as unknown as AssetShield;
     AssetShieldAddress = _AssetShield;
 
     // next we initialise our Noir libraries to generate proofs
-    circuit = await getAndBuildCircuit();
+    const circuitFile = readFileSync(
+      resolve("circuits/target/circuits.json"),
+      "utf-8",
+    );
+    const circuit = JSON.parse(circuitFile);
 
-    const backend = new BarretenbergBackend(circuit);
-    noir = new Noir(circuit, backend);
+    backend = new BarretenbergBackend(circuit);
+    noir = new Noir(circuit);
 
     // initialise our poseidon library
     await ensurePoseidon();
@@ -97,7 +102,7 @@ describe("AssetShield Testing", function () {
     it("should be able to deposit as a user with 10 tokens", async () => {
       // before the process starts, get the balance of the depositoor for testing purposes
       const balanceBefore = await NotRealTokenContract.balanceOf(
-        Deployer.address
+        Deployer.address,
       );
 
       // we need to approve the AssetShield contract to move our not real tokens
@@ -112,11 +117,11 @@ describe("AssetShield Testing", function () {
 
       // we call deposit on the contract with our generated leaf node, and that's the whole deposit flow!
       await AssetShieldContract.deposit(
-        abi.encode(["uint256"], [hashedSecret])
+        abi.encode(["uint256"], [hashedSecret]),
       );
 
       const balanceAfter = await NotRealTokenContract.balanceOf(
-        Deployer.address
+        Deployer.address,
       );
 
       // check that our deposit correctly decremented our user
@@ -158,7 +163,7 @@ describe("AssetShield Testing", function () {
 
       // to check that our tree creation went well, we can check it with the current root
       const isKnownRoot = await AssetShieldContract.isKnownRoot(
-        abi.encode(["uint256"], [tree.root])
+        abi.encode(["uint256"], [tree.root]),
       );
 
       expect(isKnownRoot).equal(true);
@@ -191,30 +196,35 @@ describe("AssetShield Testing", function () {
       };
 
       // generate our zk proof
-      const zkProof = await noir.generateProof(input);
+      const { witness } = await noir.execute(input);
+      const zkProof = await backend.generateProof(witness);
+
+      // check our proof is valid
+      const isValid = await backend.verifyProof(zkProof);
+      expect(isValid).to.eq(true);
 
       // finally, we can withdraw our funds. We will submit this tx through a runner (an unpermissioned EOA)
       const AssetShieldRunner = AssetShieldContract.connect(Runner);
 
       const withdrawerTokenBalanceBefore = await NotRealTokenContract.balanceOf(
-        Withdrawer.address
+        Withdrawer.address,
       );
 
       // we just call the withdraw function with our proof and public inputs
       await AssetShieldRunner.withdrawal(zkProof.proof, zkProof.publicInputs);
 
       const withdrawerTokenBalanceAfter = await NotRealTokenContract.balanceOf(
-        Withdrawer.address
+        Withdrawer.address,
       );
 
       // our withdrawer should have + 10 tokens now
       expect(withdrawerTokenBalanceAfter).to.eq(
-        withdrawerTokenBalanceBefore + DEPOSIT_AMOUNT
+        withdrawerTokenBalanceBefore + DEPOSIT_AMOUNT,
       );
 
       // if we try to withdraw again, our nullifier will be invalid
       await expect(
-        AssetShieldRunner.withdrawal(zkProof.proof, zkProof.publicInputs)
+        AssetShieldRunner.withdrawal(zkProof.proof, zkProof.publicInputs),
       ).to.be.revertedWith("Nullifier already used!");
     });
   });
