@@ -1,5 +1,5 @@
 cd circuits
-# nargo codegen-verifier 
+nargo compile
 
 bb write_vk -b ./target/circuits.json
 bb contract

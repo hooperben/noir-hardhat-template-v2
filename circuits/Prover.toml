@@ -1,0 +1,8 @@
+leaf_index = ""
+nullifier = ""
+path_indices = ["", "", "", "", "", "", "", ""]
+root = ""
+secret = ""
+siblings = ["", "", "", "", "", "", "", ""]
+withdrawal_address = ""
+withdrawal_address_nullifier = ""
