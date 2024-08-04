@@ -31,7 +31,7 @@
     "typescript": "^5.4.5"
   },
   "scripts": {
-    "build:circuit:test": "./scripts/bash/build-circuit-to-contract.sh && hardhat test",
-    "build:circuit": "./scripts/bash/build-circuit-to-contract.sh"
+    "build:circuit": "./scripts/bash/build-circuit-to-contract.sh",
+    "build:circuit:test": "./scripts/bash/build-circuit-to-contract.sh && hardhat test"
   }
 }
