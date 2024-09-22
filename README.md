@@ -14,13 +14,27 @@ but you can use `npm`, `yarn`, whatever floats your boat.
 
 You will also need:
 
-- nargo (version >= 0.31.0)
-- bb (version >= 0.41.0)
+- nargo (version >= 0.33.0)
+- bb (version >= 0.47.1)
 
 You can read more about installing them here:
 
 - nargo [here](https://noir-lang.org/docs/getting_started/installation/)
 - bb [here](https://github.com/AztecProtocol/aztec-packages/blob/master/barretenberg/cpp/src/barretenberg/bb/readme.md#installation)
+
+**Note:** versions of BB and Noir have to be somewhat micro managed to get the circuits + proofs to run happily. There's is a normally list of equivalencies [here](https://github.com/AztecProtocol/aztec-packages/blob/master/barretenberg/cpp/src/barretenberg/bb/readme.md#installation) that explain which is which, i.e:
+
+![alt text](docs/bb-ref.png)
+
+To change these versions once you have them installed, you can run:
+
+```script
+## change bb version
+bbup -v <VERSION>
+
+## change noir version
+nargo --version <VERSION>
+```
 
 ### Set Up
 
@@ -42,7 +56,7 @@ for any other hardhat commands.
 
 The Noir project is located at `circuits/`. You can read more about Noir project structure in their [docs](https://noir-lang.org/docs/).
 
-For this template, it's assumed that you will have `nargo >= 0.31.0` installed. You can find installation instructions [here](https://noir-lang.org/docs/getting_started/installation/).
+For this template, it's assumed that you will have `nargo >= 0.33.0` installed. You can find installation instructions [here](https://noir-lang.org/docs/getting_started/installation/).
 
 Noir allows you to test your circuit within the `circuits/src/main.nr` file, and those tests can be ran within noir by running:
 
